@@ -221,3 +221,6 @@ __marimo__/
 
 # Gradio
 .gradio/
+
+# Ignore ephemeral path for session data
+data/
