@@ -77,6 +77,138 @@ def _is_header_footer_candidate(text: str) -> bool:
     return bool(re.fullmatch(r"[\w\s\-.,:/()]+", t)) and any(ch.isalpha() for ch in t)
 
 
+def _union_bbox(
+    a: tuple[float, float, float, float] | None,
+    b: tuple[float, float, float, float] | None,
+) -> tuple[float, float, float, float] | None:
+    if a is None:
+        return b
+    if b is None:
+        return a
+    return (
+        min(a[0], b[0]),
+        min(a[1], b[1]),
+        max(a[2], b[2]),
+        max(a[3], b[3]),
+    )
+
+
+def _should_merge_blocks(
+    prev: ExtractedBlock,
+    curr: ExtractedBlock,
+    x_tol: float = 24.0,
+    y_gap_tol: float = 14.0,
+) -> bool:
+    """
+    Merge visually continuous PDF blocks that belong to the same paragraph.
+
+    Heuristics:
+    - same left indentation
+    - small vertical gap
+    - previous line does not look like a hard paragraph break
+    - current line is not obviously a new heading/bullet
+    """
+    if prev.bbox is None or curr.bbox is None:
+        return False
+
+    prev_x0, prev_y0, prev_x1, prev_y1 = prev.bbox
+    curr_x0, curr_y0, curr_x1, curr_y1 = curr.bbox
+
+    same_left = abs(prev_x0 - curr_x0) <= x_tol
+    vertical_gap = curr_y0 - prev_y1
+    close_vertically = vertical_gap <= y_gap_tol
+
+    prev_text = normalize_text(prev.text)
+    curr_text = normalize_text(curr.text)
+
+    if not prev_text or not curr_text:
+        return False
+
+    # Strong signals that this is still the same paragraph / wrapped line
+    prev_continues = not re.search(r"[.!?;:]$", prev_text)
+    curr_looks_like_continuation = curr_text[0].islower() or curr_text[0] in "([“\"'"
+
+    # Avoid merging bullets or headings into paragraphs
+    if _BULLET_RE.match(curr_text):
+        return False
+    if _HEADING_RE.match(curr_text):
+        return False
+
+    return same_left and close_vertically and (prev_continues or curr_looks_like_continuation)
+
+
+def _merge_adjacent_blocks(
+    blocks: list[ExtractedBlock],
+    x_tol: float = 24.0,
+    y_gap_tol: float = 14.0,
+) -> list[ExtractedBlock]:
+    """
+    Merge blocks that are likely wrapped lines of the same paragraph.
+    """
+    if not blocks:
+        return []
+
+    ordered = sorted(
+        blocks,
+        key=lambda b: (
+            b.bbox[1] if b.bbox else 0.0,
+            b.bbox[0] if b.bbox else 0.0,
+        ),
+    )
+
+    merged: list[ExtractedBlock] = [ordered[0]]
+
+    for blk in ordered[1:]:
+        prev = merged[-1]
+
+        if _should_merge_blocks(prev, blk, x_tol=x_tol, y_gap_tol=y_gap_tol):
+            prev_text = prev.text.rstrip()
+            curr_text = blk.text.lstrip()
+
+            # If previous line ends with a hyphen, join without space.
+            if prev_text.endswith("-"):
+                combined_text = prev_text[:-1] + curr_text
+            else:
+                combined_text = prev_text + " " + curr_text
+
+            merged[-1] = ExtractedBlock(
+                text=normalize_text(combined_text),
+                bbox=_union_bbox(prev.bbox, blk.bbox),
+                font_size=max(prev.font_size, blk.font_size),
+                page=prev.page,
+                kind=prev.kind if prev.kind == blk.kind else prev.kind,
+            )
+        else:
+            merged.append(blk)
+
+    return merged
+
+
+def _split_semantic_parts(text: str) -> list[str]:
+    """
+    Optional final split for one block:
+    - keep blank-line paragraph breaks
+    - split on strong sentence breaks only if the text is very long
+    """
+    text = normalize_text(text)
+    if not text:
+        return []
+
+    # Preserve explicit paragraph breaks
+    parts = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+    if len(parts) > 1:
+        return parts
+
+    # Do NOT over-split short lines.
+    if len(re.findall(r"\w+", text)) < 40:
+        return [text]
+
+    # For very long blocks, split only on strong sentence boundaries.
+    sentence_parts = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9(])", text)
+    sentence_parts = [p.strip() for p in sentence_parts if p.strip()]
+    return sentence_parts if len(sentence_parts) > 1 else [text]
+
+
 def _dedupe_repeated_blocks(blocks_by_page: list[list[ExtractedBlock]]) -> list[list[ExtractedBlock]]:
     counts = Counter()
     for page_blocks in blocks_by_page:
@@ -162,6 +294,7 @@ def build_tree(pdf_path: str | Path, doc_side: str, cfg: AppConfig | None = None
     doc = fitz.open(pdf_path)
     blocks_by_page = [_page_blocks(page) for page in doc]
     blocks_by_page = _dedupe_repeated_blocks(blocks_by_page)
+    blocks_by_page = [_merge_adjacent_blocks(page_blocks) for page_blocks in blocks_by_page]
 
     page_count = len(blocks_by_page)
     node_map: dict[str, SourceNode] = {}
@@ -232,7 +365,7 @@ def build_tree(pdf_path: str | Path, doc_side: str, cfg: AppConfig | None = None
                 continue
 
             # Split long blocks on blank lines to preserve clause-ish granularity.
-            parts = [p.strip() for p in re.split(r"\n\s*\n", text) if p.strip()]
+            parts = _split_semantic_parts(text)
             if not parts:
                 parts = [text]
 
