@@ -5,7 +5,6 @@ from functools import lru_cache
 from typing import Iterable
 
 import torch
-import torch
 import numpy as np
 from loguru import logger
 from sklearn.feature_extraction.text import HashingVectorizer
@@ -36,37 +35,16 @@ def load_embedding_backend(model_name: str, fallback_name: str, hf_token: str | 
                 else "cpu"
             )
             logger.info("Configuring ST with {} device", device)
-            model = SentenceTransformer(
+            model = SentenceTransformer(    # type: ignore[arg-type]
                 model_name,
                 device=device,
                 **kwargs,
-            )device = (
-                "cuda"
-                if torch.cuda.is_available()
-                else "cpu"
-            )
-            logger.info("Configuring with {} device", device)
-            model = SentenceTransformer(
-                model_name,
-                device=device,
-               ,
-            ) # type: ignore[arg-type]
+            ) 
             dim = int(model.get_embedding_dimension())
             logger.info("Loaded embedding model {}", model_name)
             return EmbeddingBackend(name=model_name, dim=dim, model=model, fallback=False)
         except Exception as exc:
             logger.warning("Could not load embedding model {}: {}", model_name, exc)
-
-        try:
-            kwargs = {}
-            if hf_token:
-                kwargs["token"] = hf_token
-            model = SentenceTransformer(fallback_name, **kwargs)  # type: ignore[arg-type]
-            dim = int(model.get_embedding_dimension())
-            logger.info("Loaded fallback embedding model {}", fallback_name)
-            return EmbeddingBackend(name=fallback_name, dim=dim, model=model, fallback=False)
-        except Exception as exc:
-            logger.warning("Could not load fallback embedding model {}: {}", fallback_name, exc)
 
     logger.warning("Using hash-based embeddings fallback")
     return EmbeddingBackend(name="hashing-fallback", dim=768, model=None, fallback=True)
@@ -79,6 +57,25 @@ def _hash_embeddings(texts: list[str], dim: int = 768) -> np.ndarray:
     arr = sk_normalize(arr, norm="l2", axis=1, copy=False)
     return arr.astype(np.float32, copy=False)
 
+def embed_two_corpora(
+    backend: EmbeddingBackend,
+    legacy_texts: list[str],
+    modern_texts: list[str],
+    batch_size: int = 64,
+) -> tuple[np.ndarray, np.ndarray]:
+    logger.info("Batching the legacy & modern text together instead of individual ST calls for embedding.")
+
+    all_texts = legacy_texts + modern_texts
+    if not all_texts:
+        empty = np.zeros((0, backend.dim), dtype=np.float32)
+        return empty, empty
+
+    all_emb = embed_texts(backend, all_texts, batch_size=batch_size)
+
+    logger.info("Seperated the legacy & modern embeddings from one another.")
+    
+    split_at = len(legacy_texts)
+    return all_emb[:split_at], all_emb[split_at:]
 
 def embed_texts(backend: EmbeddingBackend, texts: list[str], batch_size: int = 2048) -> np.ndarray:
     if not texts:

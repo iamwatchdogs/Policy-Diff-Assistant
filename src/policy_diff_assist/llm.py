@@ -58,7 +58,8 @@ def build_prompt(context_pack: dict, cfg: AppConfig) -> str:
     )
 
     return f"""You are a policy compliance assistant.
-Explain the semantic difference between the legacy and modern policy snippets.
+Explain the semantic difference between the legacy and modern policy snippets. 
+You MUST explain the differences with atleast 3-4 lines worth of only useful insights.
 
 Legacy snippet:
 {legacy_text}
@@ -118,6 +119,7 @@ def heuristic_summary(context_pack: dict) -> str:
 
 
 def stream_summary(context_pack: dict, backend: LLMBackend, cfg: AppConfig) -> Iterator[str]:
+    logger.info("Content is being streamed to the UI")
     if not backend.ready or backend.model is None or backend.tokenizer is None or TextIteratorStreamer is None or torch is None:
         text = heuristic_summary(context_pack)
         # stream in small chunks to mimic real-time generation

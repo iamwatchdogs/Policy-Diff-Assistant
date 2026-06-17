@@ -3,14 +3,15 @@ from __future__ import annotations
 import shutil
 import uuid
 from pathlib import Path
-from typing import Callable, Iterator
+from typing import Callable, Iterator, Literal
+from concurrent.futures import ThreadPoolExecutor
 
 import numpy as np
 from loguru import logger
 
 from policy_diff_assist.alignment import align_trees
 from policy_diff_assist.config import AppConfig, build_default_session_dir
-from policy_diff_assist.embeddings import embed_texts, load_embedding_backend
+from policy_diff_assist.embeddings import embed_two_corpora, load_embedding_backend
 from policy_diff_assist.ingestion import build_tree, iter_leaf_nodes, normalize_text, write_tree
 from policy_diff_assist.llm import load_llm_backend, stream_summary
 from policy_diff_assist.models import ComparisonResult, ProgressState
@@ -22,6 +23,7 @@ ProgressCallback = Callable[[ProgressState], None]
 
 
 def _emit(cb: ProgressCallback | None, **kwargs) -> ProgressState:
+    logger.info("Updated Progress in UI")
     state = ProgressState(**kwargs)
     if cb is not None:
         cb(state)
@@ -40,6 +42,8 @@ def compare_documents(
     session_dir = build_default_session_dir(cfg, session_id) if output_root is None else Path(output_root) / session_id
     session_dir.mkdir(parents=True, exist_ok=True)
 
+    logger.info("Session {} Iniitated", session_id)
+
     legacy_pdf = Path(legacy_pdf)
     modern_pdf = Path(modern_pdf)
 
@@ -57,15 +61,21 @@ def compare_documents(
 
     _emit(progress_cb, stage="parsing", percent=8, message="Parsing PDF files", session_id=session_id)
 
-    legacy_tree = build_tree(legacy_work / legacy_pdf.name, "legacy", cfg)
-    modern_tree = build_tree(modern_work / modern_pdf.name, "modern", cfg)
+    def docs_to_json(doc_path: str | Path, doc_type: Literal["legacy", "modern"], config: AppConfig) -> None:
+        tree_content = build_tree(doc_path, doc_type, config)
+        write_tree(tree_content, session_dir / f"{doc_type}.msgspec.json")
+        return tree_content
 
-    write_tree(legacy_tree, session_dir / "legacy_tree.msgspec.json")
-    write_tree(modern_tree, session_dir / "modern_tree.msgspec.json")
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        thread_legacy = executor.submit(docs_to_json, legacy_work / legacy_pdf.name, "legacy", cfg)
+        thread_modern = executor.submit(docs_to_json, modern_work / modern_pdf.name, "modern", cfg)
+        legacy_tree = thread_legacy.result()
+        modern_tree = thread_modern.result()
 
     logger.info("Saved both Index trees in temp session location.")
 
     _emit(progress_cb, stage="embedding", percent=25, message="Embedding leaf segments", session_id=session_id)
+
 
     legacy_texts = [normalize_text(n.text) for n in iter_leaf_nodes(legacy_tree)]
     modern_texts = [normalize_text(n.text) for n in iter_leaf_nodes(modern_tree)]
@@ -73,11 +83,20 @@ def compare_documents(
     logger.info("Normalized Text within the Index Trees.")
 
     emb_backend = load_embedding_backend(cfg.embedding_model_name, cfg.fallback_embedding_model_name, cfg.hf_token)
-    legacy_emb = embed_texts(emb_backend, legacy_texts, batch_size=cfg.batch_size)
-    modern_emb = embed_texts(emb_backend, modern_texts, batch_size=cfg.batch_size)
+    
+    embedding_batch_size = max(int(getattr(cfg, "batch_size", 64)), 128)
+
+    legacy_emb, modern_emb = embed_two_corpora(
+        emb_backend,
+        legacy_texts,
+        modern_texts,
+        batch_size=embedding_batch_size,
+    )
 
     np.save(session_dir / "legacy_embeddings.npy", legacy_emb)
     np.save(session_dir / "modern_embeddings.npy", modern_emb)
+
+    logger.info("Saved embedding in temp session path.")
 
     _emit(progress_cb, stage="matching", percent=55, message="Running cosine + Hungarian alignment", session_id=session_id)
 
@@ -129,6 +148,7 @@ def compare_documents(
 
     _emit(progress_cb, stage="done", percent=100, message="Comparison complete", session_id=session_id)
 
+    logger.info("Document Comparison Completed!")
     return result
 
 

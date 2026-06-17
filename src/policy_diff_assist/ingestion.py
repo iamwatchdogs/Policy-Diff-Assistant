@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
 
-import fitz  # PyMuPDF
+import fitz
 import msgspec
 
 from policy_diff_assist.config import AppConfig
@@ -292,6 +292,9 @@ def build_tree(pdf_path: str | Path, doc_side: str, cfg: AppConfig | None = None
     cfg = cfg or AppConfig.load()
     pdf_path = Path(pdf_path)
     doc = fitz.open(pdf_path)
+
+    log.info("Read the document {}", pdf_path)
+    
     blocks_by_page = [_page_blocks(page) for page in doc]
     blocks_by_page = _dedupe_repeated_blocks(blocks_by_page)
     blocks_by_page = [_merge_adjacent_blocks(page_blocks) for page_blocks in blocks_by_page]
@@ -402,7 +405,7 @@ def build_tree(pdf_path: str | Path, doc_side: str, cfg: AppConfig | None = None
         leaf_positions=leaf_positions,
     )
 
-    log.info("Successfully Built tree for {}", pdf_path)
+    log.info("Successfully Built Doument Tree.\n{}", tree)
     return tree
 
 

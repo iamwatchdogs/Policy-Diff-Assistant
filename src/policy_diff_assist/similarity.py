@@ -3,9 +3,10 @@ from __future__ import annotations
 from difflib import SequenceMatcher
 
 import numpy as np
-
+from loguru import logger
 
 def cosine_matrix(left: np.ndarray, right: np.ndarray) -> np.ndarray:
+    logger.info("Computing cosine simiarities")
     if left.size == 0 or right.size == 0:
         return np.zeros((left.shape[0], right.shape[0]), dtype=np.float32)
     left = np.asarray(left, dtype=np.float32)
@@ -14,10 +15,12 @@ def cosine_matrix(left: np.ndarray, right: np.ndarray) -> np.ndarray:
 
 
 def lexical_score(a: str, b: str) -> float:
+    logger.info("Computing lexical scoring")
     return float(SequenceMatcher(None, a.lower(), b.lower()).ratio())
 
 
 def heading_similarity(path_a: list[str] | None, path_b: list[str] | None) -> float:
+    logger.info("Computing heading similarities")
     if not path_a or not path_b:
         return 0.0
     if path_a == path_b:
@@ -32,6 +35,7 @@ def heading_similarity(path_a: list[str] | None, path_b: list[str] | None) -> fl
 
 
 def page_proximity_bonus(page_a: int | None, page_b: int | None) -> float:
+    logger.info("Computing page proximit bonus.")
     if page_a is None or page_b is None:
         return 0.0
     dist = abs(page_a - page_b)
@@ -56,6 +60,7 @@ def hybrid_score(
     heading_bonus = 0.06 * same_heading
     page_bonus = page_proximity_bonus(page_a, page_b)
     score = 0.84 * cosine + 0.10 * lexical + heading_bonus + page_bonus
+    logger.info("Compuated score: {}", score)
     return float(score), float(heading_bonus), float(page_bonus)
 
 

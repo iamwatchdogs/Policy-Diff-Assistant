@@ -5,11 +5,13 @@ from typing import Iterable
 
 import fitz  # PyMuPDF
 import msgspec
+from loguru import logger
 
 from policy_diff_assist.models import ComparisonResult, MatchRecord, ReportArtifact
 
 
 def build_report_markdown(result: ComparisonResult) -> str:
+    logger.info("Building Summary report.")
     counts = _count_changes(result.matches)
     lines = []
     lines.append("# Policy Diff Report")
@@ -113,6 +115,7 @@ def write_report_json(result: ComparisonResult, out_path: str | Path) -> Path:
 
 
 def build_report_artifact(result: ComparisonResult, out_dir: str | Path) -> ReportArtifact:
+    logger.info("Building report artifacts.")
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     md_path = out_dir / "report.md"

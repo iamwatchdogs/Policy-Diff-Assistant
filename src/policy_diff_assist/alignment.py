@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 import numpy as np
+from loguru import logger
 from scipy.optimize import linear_sum_assignment
 
 from policy_diff_assist.config import AppConfig
@@ -18,7 +19,11 @@ class AlignmentOutput:
 
 
 def _leaf_nodes(tree: DocumentTree) -> list:
-    return [tree.nodes[nid] for nid in tree.leaf_ids if nid in tree.nodes and tree.nodes[nid].kind != "document"]
+    nodes = tree.nodes
+    return [
+        nodes[nid] for nid in tree.leaf_ids
+        if nid in nodes and nodes[nid].kind != "document"
+    ]
 
 
 def _candidate_mask(left_nodes, right_nodes, i: int, j: int) -> bool:
@@ -43,6 +48,7 @@ def align_trees(
     modern_nodes = _leaf_nodes(modern_tree)
 
     if not legacy_nodes and not modern_nodes:
+        logger.info("No Matches found between legacy and modern.")
         return AlignmentOutput(matches=[], sim_matrix=np.zeros((0, 0), dtype=np.float32), candidate_matrix=np.zeros((0, 0), dtype=np.float32))
 
     sim = cosine_matrix(legacy_emb, modern_emb)
@@ -65,6 +71,7 @@ def align_trees(
 
 
 def _hungarian_with_unmatched(left_nodes, right_nodes, score: np.ndarray, cfg: AppConfig) -> list[MatchRecord]:
+    logger.info("Processing unmatched embedding within hungarian matching.")
     n, m = score.shape
     if n == 0 and m == 0:
         return []

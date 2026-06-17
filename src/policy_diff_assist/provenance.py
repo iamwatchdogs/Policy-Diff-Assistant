@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import Any
+from loguru import logger
 
 from policy_diff_assist.models import DocumentTree, MatchRecord, SourceNode
 
@@ -77,6 +78,8 @@ def build_context_pack(
 
     legacy_neighbors = [_node_to_dict(legacy_tree.nodes[nid]) for nid in _neighbor_ids(legacy_tree, match.legacy_id or "", window) if nid in legacy_tree.nodes] if match.legacy_id else []
     modern_neighbors = [_node_to_dict(modern_tree.nodes[nid]) for nid in _neighbor_ids(modern_tree, match.modern_id or "", window) if nid in modern_tree.nodes] if match.modern_id else []
+
+    logger.info("Built trace back context for LLM processing.")
 
     return {
         "match_id": f"{match.legacy_id or 'none'}::{match.modern_id or 'none'}",

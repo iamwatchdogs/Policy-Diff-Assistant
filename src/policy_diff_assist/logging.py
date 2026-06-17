@@ -4,7 +4,7 @@ import sys
 from datetime import datetime
 from loguru import logger
 
-from policy_diff_assistpolicy_diff_assist.config import AppConfig
+from policy_diff_assist.config import AppConfig
 
 
 def setup_logging(cfg: AppConfig) -> None:

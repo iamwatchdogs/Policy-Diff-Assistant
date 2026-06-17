@@ -37,11 +37,11 @@ def main() -> None:
         output_root=args.output_root,
         cfg=cfg,
     )
-    print(f"Session: {result.session_id}")
-    print(f"Report markdown: {result.report_md_path}")
-    print(f"Report PDF: {result.report_pdf_path}")
-    print(f"Report JSON: {result.report_json_path}")
-    print(result.summary)
+    log.info("Session: {}", result.session_id)
+    log.info("Report markdown: {}", result.report_md_path)
+    log.info("Report PDF: {}", result.report_pdf_path)
+    log.info("Report JSON: {}", result.report_json_path)
+    log.info("Result Summary:\n{}", result.summary)
 
 
 if __name__ == "__main__":  # pragma: no cover
