@@ -1,0 +1,14 @@
+embedding_model_name = "Qwen/Qwen3-Embedding-4B"
+fallback_embedding_model_name = "sentence-transformers/all-MiniLM-L6-v2"
+llm_model_name = "Qwen/Qwen3.5-9B-Instruct"
+use_vllm = false
+temperature = 0.2
+max_new_tokens = 512
+top_k_candidates = 5
+min_similarity = 0.75
+unchanged_threshold = 0.92
+modified_threshold = 0.75
+batch_size = 64
+chunk_chars = 1200
+neighbors_window = 1
+keep_intermediate_json = true
