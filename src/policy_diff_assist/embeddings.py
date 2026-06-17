@@ -32,7 +32,17 @@ def load_embedding_backend(model_name: str, fallback_name: str, hf_token: str | 
             kwargs = {}
             if hf_token:
                 kwargs["token"] = hf_token
-            model = SentenceTransformer(model_name, **kwargs)  # type: ignore[arg-type]
+            device = (
+                "cuda"
+                if torch.cuda.is_available()
+                else "cpu"
+            )
+            log.info("Configuring ST with {} device", device)
+            model = SentenceTransformer(
+                model_name,
+                device=device,
+                **kwargs,
+            ) # type: ignore[arg-type]
             dim = int(model.get_embedding_dimension())
             logger.info("Loaded embedding model {}", model_name)
             return EmbeddingBackend(name=model_name, dim=dim, model=model, fallback=False)
