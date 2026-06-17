@@ -58,7 +58,7 @@ def create_ui(cfg: AppConfig | None = None) -> gr.Blocks:
 def launch() -> None:
     cfg = AppConfig.load()
     demo = create_ui(cfg)
-    demo.queue(default_concurrency_limit=1).launch()
+    demo.queue(default_concurrency_limit=1).launch(share=True)
 
 
 if __name__ == "__main__":  # pragma: no cover
