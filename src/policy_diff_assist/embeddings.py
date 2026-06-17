@@ -62,7 +62,7 @@ def _hash_embeddings(texts: list[str], dim: int = 768) -> np.ndarray:
     return arr.astype(np.float32, copy=False)
 
 
-def embed_texts(backend: EmbeddingBackend, texts: list[str], batch_size: int = 64) -> np.ndarray:
+def embed_texts(backend: EmbeddingBackend, texts: list[str], batch_size: int = 2048) -> np.ndarray:
     if not texts:
         return np.zeros((0, backend.dim), dtype=np.float32)
 

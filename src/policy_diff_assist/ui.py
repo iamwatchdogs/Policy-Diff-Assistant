@@ -34,6 +34,8 @@ def create_ui(cfg: AppConfig | None = None) -> gr.Blocks:
                 yield "Please upload both PDFs.", "", None
                 return
 
+            log.info("User submitted PDFs")n
+
             log.info("User submitted PDFs")
 
             def progress_cb(state: ProgressState):
@@ -54,6 +56,7 @@ def create_ui(cfg: AppConfig | None = None) -> gr.Blocks:
 
         run_btn.click(_run, inputs=[legacy_file, modern_file], outputs=[status, summary, report_file])
     
+    log.info("UI created successfully")    
     log.info("UI created successfully")
     return demo
 
@@ -61,10 +64,19 @@ def create_ui(cfg: AppConfig | None = None) -> gr.Blocks:
 def launch() -> None:
     log.info("Application Initiated")
 
+    log.info("cfg = Application Initiated")
+
     cfg = AppConfig.load()
+    demo = create_ui(cfg)
+    demo.queue(default_concurrency_limit=1).lConfig.load()
     demo = create_ui(cfg)
     demo.queue(default_concurrency_limit=1).launch(share=True)
 
 
 if __name__ == "__main__":  # pragma: no cover
+    (share=True)
+
+
+if __name__ == "__main__":  # pragma: no cover
     launch()
+)

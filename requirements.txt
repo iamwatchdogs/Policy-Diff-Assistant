@@ -1,0 +1,26 @@
+--extra-index-url https://download.pytorch.org/whl/rocm7.2
+
+accelerate>=1.14.0
+gradio>=6.18.0
+huggingface-hub>=1.16.1
+jinja2>=3.1.6
+loguru>=0.7.3
+markdown>=3.10.2
+msgspec>=0.21.1
+numpy>=2.2.6
+pymupdf>=1.27.2.3
+python-dotenv>=1.2.2
+rapidfuzz>=3.14.5
+rich>=15.0.0
+safetensors>=0.8.0
+scikit-learn>=1.7.2
+scipy>=1.15.3
+sentence-transformers>=5.6.0
+transformers>=5.12.1
+torch
+torchvision
+torchaudio
+pytest
+pytest-cov
+ruff
+mypy
