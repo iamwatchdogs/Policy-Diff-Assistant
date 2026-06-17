@@ -14,7 +14,7 @@ except Exception:  # pragma: no cover
     TextIteratorStreamer = None  # type: ignore
     torch = None  # type: ignore
 
-from .config import AppConfig
+from policy_diff_assist.config import AppConfig
 
 
 @dataclass(slots=True)

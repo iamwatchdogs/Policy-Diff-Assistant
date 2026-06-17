@@ -10,9 +10,9 @@ from typing import Iterable
 import fitz  # PyMuPDF
 import msgspec
 
-from .config import AppConfig
-from .models import DocumentTree, SourceNode
-from .logging import get_logger
+from policy_diff_assist.config import AppConfig
+from policy_diff_assist.models import DocumentTree, SourceNode
+from policy_diff_assist.logging import get_logger
 
 log = get_logger(__name__)
 

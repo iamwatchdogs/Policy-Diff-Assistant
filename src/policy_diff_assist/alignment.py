@@ -5,9 +5,9 @@ from dataclasses import dataclass
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 
-from .config import AppConfig
-from .models import DocumentTree, MatchRecord
-from .similarity import clip01, cosine_matrix, hybrid_score, lexical_score
+from policy_diff_assist.config import AppConfig
+from policy_diff_assist.models import DocumentTree, MatchRecord
+from policy_diff_assist.similarity import clip01, cosine_matrix, hybrid_score, lexical_score
 
 
 @dataclass(slots=True)

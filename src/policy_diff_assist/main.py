@@ -3,10 +3,10 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from .config import AppConfig
-from .logging import setup_logging, get_logger
-from .pipeline import compare_documents
-from .ui import launch
+from policy_diff_assist.config import AppConfig
+from policy_diff_assist.logging import setup_logging, get_logger
+from policy_diff_assist.pipeline import compare_documents
+from policy_diff_assist.ui import launch
 
 log = get_logger(__name__)
 

@@ -1,10 +1,8 @@
 from __future__ import annotations
 
-from collections import defaultdict
-from pathlib import Path
 from typing import Any
 
-from .models import DocumentTree, MatchRecord, SourceNode
+from policy_diff_assist.models import DocumentTree, MatchRecord, SourceNode
 
 
 def build_parent_map(tree: DocumentTree) -> dict[str, str | None]:

@@ -6,7 +6,7 @@ from typing import Iterable
 import fitz  # PyMuPDF
 import msgspec
 
-from .models import ComparisonResult, MatchRecord, ReportArtifact
+from policy_diff_assist.models import ComparisonResult, MatchRecord, ReportArtifact
 
 
 def build_report_markdown(result: ComparisonResult) -> str:

@@ -2,7 +2,7 @@ PROJECT_NAME = policy-diff-assist
 VENV = .venv
 PYTHON = $(VENV)/bin/python
 PIP = $(VENV)/bin/pip
-APP = src/policy_diff_assist/main.py
+APP = policy_diff_assist.main
 
 .PHONY: help init install run test lint format clean reset
 
@@ -31,7 +31,7 @@ install: $(VENV)/bin/activate
 	$(PIP) install -r requirements.txt
 
 run: $(VENV)/bin/activate
-	$(PYTHON) $(APP)
+	PYTHONPATH=src $(PYTHON) -m $(APP)
 
 test: $(VENV)/bin/activate
 	$(PYTHON) -m pytest

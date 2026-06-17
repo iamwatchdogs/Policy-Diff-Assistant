@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import sys
 from datetime import datetime
-from pathlib import Path
-
 from loguru import logger
 
-from .config import AppConfig
+from policy_diff_assistpolicy_diff_assist.config import AppConfig
 
 
 def setup_logging(cfg: AppConfig) -> None:

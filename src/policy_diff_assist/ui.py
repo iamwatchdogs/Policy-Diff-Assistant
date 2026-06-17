@@ -1,13 +1,11 @@
 from __future__ import annotations
 
-from pathlib import Path
-
 import gradio as gr
 
-from .config import AppConfig
-from .logging import setup_logging, get_logger
-from .pipeline import compare_documents
-from .models import ProgressState
+from policy_diff_assist.config import AppConfig
+from policy_diff_assist.logging import setup_logging, get_logger
+from policy_diff_assist.pipeline import compare_documents
+from policy_diff_assist.models import ProgressState
 
 log = get_logger(__name__)
 
@@ -34,8 +32,6 @@ def create_ui(cfg: AppConfig | None = None) -> gr.Blocks:
                 yield "Please upload both PDFs.", "", None
                 return
 
-            log.info("User submitted PDFs")n
-
             log.info("User submitted PDFs")
 
             def progress_cb(state: ProgressState):
@@ -57,26 +53,16 @@ def create_ui(cfg: AppConfig | None = None) -> gr.Blocks:
         run_btn.click(_run, inputs=[legacy_file, modern_file], outputs=[status, summary, report_file])
     
     log.info("UI created successfully")    
-    log.info("UI created successfully")
     return demo
 
 
 def launch() -> None:
     log.info("Application Initiated")
 
-    log.info("cfg = Application Initiated")
-
     cfg = AppConfig.load()
-    demo = create_ui(cfg)
-    demo.queue(default_concurrency_limit=1).lConfig.load()
     demo = create_ui(cfg)
     demo.queue(default_concurrency_limit=1).launch(share=True)
 
 
 if __name__ == "__main__":  # pragma: no cover
-    (share=True)
-
-
-if __name__ == "__main__":  # pragma: no cover
     launch()
-)

@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from functools import lru_cache
 from typing import Iterable
 
+import torch
+import torch
 import numpy as np
 from loguru import logger
 from sklearn.feature_extraction.text import HashingVectorizer
@@ -13,10 +15,6 @@ try:
     from sentence_transformers import SentenceTransformer
 except Exception:  # pragma: no cover
     SentenceTransformer = None  # type: ignore
-
-from .config import AppConfig
-
-
 @dataclass(slots=True)
 class EmbeddingBackend:
     name: str
@@ -37,11 +35,21 @@ def load_embedding_backend(model_name: str, fallback_name: str, hf_token: str | 
                 if torch.cuda.is_available()
                 else "cpu"
             )
-            log.info("Configuring ST with {} device", device)
+            logger.info("Configuring ST with {} device", device)
             model = SentenceTransformer(
                 model_name,
                 device=device,
                 **kwargs,
+            )device = (
+                "cuda"
+                if torch.cuda.is_available()
+                else "cpu"
+            )
+            logger.info("Configuring with {} device", device)
+            model = SentenceTransformer(
+                model_name,
+                device=device,
+               ,
             ) # type: ignore[arg-type]
             dim = int(model.get_embedding_dimension())
             logger.info("Loaded embedding model {}", model_name)

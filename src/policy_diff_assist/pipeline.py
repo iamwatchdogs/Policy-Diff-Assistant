@@ -6,17 +6,16 @@ from pathlib import Path
 from typing import Callable, Iterator
 
 import numpy as np
-import msgspec
 from loguru import logger
 
-from .alignment import align_trees
-from .config import AppConfig, build_default_session_dir
-from .embeddings import embed_texts, load_embedding_backend
-from .ingestion import build_tree, iter_leaf_nodes, normalize_text, write_tree
-from .llm import load_llm_backend, stream_summary
-from .models import ComparisonResult, ProgressState
-from .provenance import build_context_pack
-from .reporting import build_report_artifact
+from policy_diff_assist.alignment import align_trees
+from policy_diff_assist.config import AppConfig, build_default_session_dir
+from policy_diff_assist.embeddings import embed_texts, load_embedding_backend
+from policy_diff_assist.ingestion import build_tree, iter_leaf_nodes, normalize_text, write_tree
+from policy_diff_assist.llm import load_llm_backend, stream_summary
+from policy_diff_assist.models import ComparisonResult, ProgressState
+from policy_diff_assist.provenance import build_context_pack
+from policy_diff_assist.reporting import build_report_artifact
 
 
 ProgressCallback = Callable[[ProgressState], None]
