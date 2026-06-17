@@ -54,6 +54,8 @@ def compare_documents(
     shutil.copy2(legacy_pdf, legacy_work / legacy_pdf.name)
     shutil.copy2(modern_pdf, modern_work / modern_pdf.name)
 
+    logger.info("Saved PDF files to temp session location.")
+
     _emit(progress_cb, stage="parsing", percent=8, message="Parsing PDF files", session_id=session_id)
 
     legacy_tree = build_tree(legacy_work / legacy_pdf.name, "legacy", cfg)
@@ -62,10 +64,14 @@ def compare_documents(
     write_tree(legacy_tree, session_dir / "legacy_tree.msgspec.json")
     write_tree(modern_tree, session_dir / "modern_tree.msgspec.json")
 
+    logger.info("Saved both Index trees in temp session location.")
+
     _emit(progress_cb, stage="embedding", percent=25, message="Embedding leaf segments", session_id=session_id)
 
     legacy_texts = [normalize_text(n.text) for n in iter_leaf_nodes(legacy_tree)]
     modern_texts = [normalize_text(n.text) for n in iter_leaf_nodes(modern_tree)]
+
+    logger.info("Normalized Text within the Index Trees.")
 
     emb_backend = load_embedding_backend(cfg.embedding_model_name, cfg.fallback_embedding_model_name, cfg.hf_token)
     legacy_emb = embed_texts(emb_backend, legacy_texts, batch_size=cfg.batch_size)

@@ -33,7 +33,7 @@ def load_embedding_backend(model_name: str, fallback_name: str, hf_token: str | 
             if hf_token:
                 kwargs["token"] = hf_token
             model = SentenceTransformer(model_name, **kwargs)  # type: ignore[arg-type]
-            dim = int(model.get_sentence_embedding_dimension())
+            dim = int(model.get_embedding_dimension())
             logger.info("Loaded embedding model {}", model_name)
             return EmbeddingBackend(name=model_name, dim=dim, model=model, fallback=False)
         except Exception as exc:
@@ -44,7 +44,7 @@ def load_embedding_backend(model_name: str, fallback_name: str, hf_token: str | 
             if hf_token:
                 kwargs["token"] = hf_token
             model = SentenceTransformer(fallback_name, **kwargs)  # type: ignore[arg-type]
-            dim = int(model.get_sentence_embedding_dimension())
+            dim = int(model.get_embedding_dimension())
             logger.info("Loaded fallback embedding model {}", fallback_name)
             return EmbeddingBackend(name=fallback_name, dim=dim, model=model, fallback=False)
         except Exception as exc:
@@ -71,6 +71,7 @@ def embed_texts(backend: EmbeddingBackend, texts: list[str], batch_size: int = 6
 
     model = backend.model
     try:
+        logger.info("Started embedding")
         emb = model.encode(  # type: ignore[attr-defined]
             texts,
             batch_size=batch_size,
@@ -78,6 +79,7 @@ def embed_texts(backend: EmbeddingBackend, texts: list[str], batch_size: int = 6
             convert_to_numpy=True,
             normalize_embeddings=True,
         )
+        logger.info("Returning embedding as numpy arrays")
         return np.asarray(emb, dtype=np.float32)
     except Exception as exc:
         logger.warning("Embedding encode failed ({}); falling back to hash vectors", exc)

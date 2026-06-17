@@ -34,6 +34,8 @@ def create_ui(cfg: AppConfig | None = None) -> gr.Blocks:
                 yield "Please upload both PDFs.", "", None
                 return
 
+            log.info("User submitted PDFs")
+
             def progress_cb(state: ProgressState):
                 progress(
                     min(max(state.percent / 100.0, 0.0), 1.0),
@@ -51,11 +53,14 @@ def create_ui(cfg: AppConfig | None = None) -> gr.Blocks:
             yield status_msg, result.summary, result.report_pdf_path
 
         run_btn.click(_run, inputs=[legacy_file, modern_file], outputs=[status, summary, report_file])
-
+    
+    log.info("UI created successfully")
     return demo
 
 
 def launch() -> None:
+    log.info("Application Initiated")
+
     cfg = AppConfig.load()
     demo = create_ui(cfg)
     demo.queue(default_concurrency_limit=1).launch(share=True)

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sys
+from datetime import datetime
 from pathlib import Path
 
 from loguru import logger
@@ -19,7 +20,7 @@ def setup_logging(cfg: AppConfig) -> None:
         diagnose=False,
     )
     logger.add(
-        cfg.logs_dir / "policy_diff.log",
+        cfg.logs_dir / f"policy_diff_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log",
         level="DEBUG",
         rotation="10 MB",
         retention="7 days",

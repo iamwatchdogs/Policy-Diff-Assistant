@@ -155,6 +155,8 @@ def _node_id(doc_side: str, page: int, kind: str, path: list[str], local_index: 
 
 
 def build_tree(pdf_path: str | Path, doc_side: str, cfg: AppConfig | None = None) -> DocumentTree:
+    log.info("Started Built tree for {}", pdf_path)
+
     cfg = cfg or AppConfig.load()
     pdf_path = Path(pdf_path)
     doc = fitz.open(pdf_path)
@@ -266,6 +268,8 @@ def build_tree(pdf_path: str | Path, doc_side: str, cfg: AppConfig | None = None
         leaf_ids=leaf_ids,
         leaf_positions=leaf_positions,
     )
+
+    log.info("Successfully Built tree for {}", pdf_path)
     return tree
 
 
