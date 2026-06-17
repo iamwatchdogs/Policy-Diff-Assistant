@@ -33,7 +33,9 @@ def build_report_markdown(result: ComparisonResult) -> str:
     lines.append("## Detailed changes")
     lines.append("")
     for idx, match in enumerate(result.matches, start=1):
-        lines.append(f"### {idx}. {match.change_type.title()} | similarity={match.similarity:.3f}")
+        lines.append(
+            f"### {idx}. {match.change_type.title()} | similarity={match.similarity:.3f}"
+        )
         if match.legacy_id:
             lines.append(f"- Legacy: `{match.legacy_id}` (page {match.legacy_page})")
         if match.modern_id:
@@ -57,7 +59,9 @@ def _indent_block(text: str, prefix: str = "    ") -> str:
     return "\n".join(prefix + line for line in text.splitlines())
 
 
-def write_report_pdf(report_md: str, out_path: str | Path, title: str = "Policy Diff Report") -> Path:
+def write_report_pdf(
+    report_md: str, out_path: str | Path, title: str = "Policy Diff Report"
+) -> Path:
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
@@ -114,7 +118,9 @@ def write_report_json(result: ComparisonResult, out_path: str | Path) -> Path:
     return out_path
 
 
-def build_report_artifact(result: ComparisonResult, out_dir: str | Path) -> ReportArtifact:
+def build_report_artifact(
+    result: ComparisonResult, out_dir: str | Path
+) -> ReportArtifact:
     logger.info("Building report artifacts.")
     out_dir = Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)

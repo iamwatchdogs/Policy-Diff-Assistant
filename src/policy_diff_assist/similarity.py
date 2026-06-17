@@ -5,6 +5,7 @@ from difflib import SequenceMatcher
 import numpy as np
 from loguru import logger
 
+
 def cosine_matrix(left: np.ndarray, right: np.ndarray) -> np.ndarray:
     logger.info("Computing cosine simiarities")
     if left.size == 0 or right.size == 0:

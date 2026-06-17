@@ -41,7 +41,9 @@ class MatchRecord(msgspec.Struct, omit_defaults=True):
     modern_page: int | None = None
     similarity: float = 0.0
     lexical_score: float = 0.0
-    change_type: str = "modified"  # unchanged / modified / added / removed / split / merged
+    change_type: str = (
+        "modified"  # unchanged / modified / added / removed / split / merged
+    )
     evidence_ids: list[str] = msgspec.field(default_factory=list)
     legacy_text: str | None = None
     modern_text: str | None = None

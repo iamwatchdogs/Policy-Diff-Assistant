@@ -15,7 +15,9 @@ def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Policy Diff Assistant")
     parser.add_argument("--legacy", type=str, help="Path to the legacy PDF")
     parser.add_argument("--modern", type=str, help="Path to the modern PDF")
-    parser.add_argument("--output-root", type=str, default=None, help="Output root directory")
+    parser.add_argument(
+        "--output-root", type=str, default=None, help="Output root directory"
+    )
     parser.add_argument("--ui", action="store_true", help="Launch the Gradio UI")
     return parser
 
@@ -46,4 +48,3 @@ def main() -> None:
 
 if __name__ == "__main__":  # pragma: no cover
     main()
-

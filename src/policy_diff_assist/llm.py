@@ -31,7 +31,9 @@ def load_llm_backend(cfg: AppConfig) -> LLMBackend:
         return LLMBackend(name="heuristic-fallback", ready=False)
 
     try:
-        tokenizer = AutoTokenizer.from_pretrained(cfg.llm_model_name, token=cfg.hf_token, use_fast=True)
+        tokenizer = AutoTokenizer.from_pretrained(
+            cfg.llm_model_name, token=cfg.hf_token, use_fast=True
+        )
         model = AutoModelForCausalLM.from_pretrained(
             cfg.llm_model_name,
             token=cfg.hf_token,
@@ -39,7 +41,9 @@ def load_llm_backend(cfg: AppConfig) -> LLMBackend:
             device_map="auto",
         )
         logger.info("Loaded LLM model {}", cfg.llm_model_name)
-        return LLMBackend(name=cfg.llm_model_name, tokenizer=tokenizer, model=model, ready=True)
+        return LLMBackend(
+            name=cfg.llm_model_name, tokenizer=tokenizer, model=model, ready=True
+        )
     except Exception as exc:
         logger.warning("Could not load LLM model {}: {}", cfg.llm_model_name, exc)
         return LLMBackend(name="heuristic-fallback", ready=False)
@@ -51,7 +55,9 @@ def build_prompt(context_pack: dict, cfg: AppConfig) -> str:
     legacy_text = legacy.get("text") or ""
     modern_text = modern.get("text") or ""
     stats = context_pack.get("stats") or {}
-    neighbors = context_pack.get("legacy_neighbors", []) + context_pack.get("modern_neighbors", [])
+    neighbors = context_pack.get("legacy_neighbors", []) + context_pack.get(
+        "modern_neighbors", []
+    )
 
     neighbor_text = "\n".join(
         f"- {n.get('page')}: {n.get('text', '')[:500]}" for n in neighbors[:6]
@@ -68,10 +74,10 @@ Modern snippet:
 {modern_text}
 
 Similarity stats:
-- cosine: {stats.get('cosine', 0.0):.3f}
-- lexical: {stats.get('lexical', 0.0):.3f}
-- heading bonus: {stats.get('heading_bonus', 0.0):.3f}
-- page bonus: {stats.get('page_bonus', 0.0):.3f}
+- cosine: {stats.get("cosine", 0.0):.3f}
+- lexical: {stats.get("lexical", 0.0):.3f}
+- heading bonus: {stats.get("heading_bonus", 0.0):.3f}
+- page bonus: {stats.get("page_bonus", 0.0):.3f}
 
 Neighboring context:
 {neighbor_text if neighbor_text else "(none)"}
@@ -114,13 +120,25 @@ def heuristic_summary(context_pack: dict) -> str:
             ops.append(f"Added '{right[:80]}'.")
     if not ops:
         ops.append("The wording is substantially similar, with only minor edits.")
-    impact = "This may affect obligations, exceptions, or compliance scope." if change_type != "unchanged" else "Low impact change."
+    impact = (
+        "This may affect obligations, exceptions, or compliance scope."
+        if change_type != "unchanged"
+        else "Low impact change."
+    )
     return " ".join(ops) + f" {impact}"
 
 
-def stream_summary(context_pack: dict, backend: LLMBackend, cfg: AppConfig) -> Iterator[str]:
+def stream_summary(
+    context_pack: dict, backend: LLMBackend, cfg: AppConfig
+) -> Iterator[str]:
     logger.info("Content is being streamed to the UI")
-    if not backend.ready or backend.model is None or backend.tokenizer is None or TextIteratorStreamer is None or torch is None:
+    if (
+        not backend.ready
+        or backend.model is None
+        or backend.tokenizer is None
+        or TextIteratorStreamer is None
+        or torch is None
+    ):
         text = heuristic_summary(context_pack)
         # stream in small chunks to mimic real-time generation
         buf = ""
@@ -138,7 +156,9 @@ def stream_summary(context_pack: dict, backend: LLMBackend, cfg: AppConfig) -> I
         device = getattr(model, "device", None)
         if device is not None:
             inputs = {k: v.to(device) for k, v in inputs.items()}
-        streamer = TextIteratorStreamer(tokenizer, skip_prompt=True, skip_special_tokens=True)
+        streamer = TextIteratorStreamer(
+            tokenizer, skip_prompt=True, skip_special_tokens=True
+        )
         generation_kwargs = dict(
             **inputs,
             streamer=streamer,
@@ -148,7 +168,9 @@ def stream_summary(context_pack: dict, backend: LLMBackend, cfg: AppConfig) -> I
         )
         import threading
 
-        thread = threading.Thread(target=model.generate, kwargs=generation_kwargs, daemon=True)
+        thread = threading.Thread(
+            target=model.generate, kwargs=generation_kwargs, daemon=True
+        )
         thread.start()
 
         acc = ""
@@ -160,7 +182,9 @@ def stream_summary(context_pack: dict, backend: LLMBackend, cfg: AppConfig) -> I
         yield heuristic_summary(context_pack)
 
 
-def summarize_context_pack(context_pack: dict, backend: LLMBackend, cfg: AppConfig) -> str:
+def summarize_context_pack(
+    context_pack: dict, backend: LLMBackend, cfg: AppConfig
+) -> str:
     text = ""
     for chunk in stream_summary(context_pack, backend, cfg):
         text = chunk

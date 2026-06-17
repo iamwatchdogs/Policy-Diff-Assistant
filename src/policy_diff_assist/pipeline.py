@@ -12,7 +12,12 @@ from loguru import logger
 from policy_diff_assist.alignment import align_trees
 from policy_diff_assist.config import AppConfig, build_default_session_dir
 from policy_diff_assist.embeddings import embed_two_corpora, load_embedding_backend
-from policy_diff_assist.ingestion import build_tree, iter_leaf_nodes, normalize_text, write_tree
+from policy_diff_assist.ingestion import (
+    build_tree,
+    iter_leaf_nodes,
+    normalize_text,
+    write_tree,
+)
 from policy_diff_assist.llm import load_llm_backend, stream_summary
 from policy_diff_assist.models import ComparisonResult, ProgressState
 from policy_diff_assist.provenance import build_context_pack
@@ -39,7 +44,11 @@ def compare_documents(
 ) -> ComparisonResult:
     cfg = cfg or AppConfig.load()
     session_id = uuid.uuid4().hex
-    session_dir = build_default_session_dir(cfg, session_id) if output_root is None else Path(output_root) / session_id
+    session_dir = (
+        build_default_session_dir(cfg, session_id)
+        if output_root is None
+        else Path(output_root) / session_id
+    )
     session_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info("Session {} Iniitated", session_id)
@@ -47,7 +56,13 @@ def compare_documents(
     legacy_pdf = Path(legacy_pdf)
     modern_pdf = Path(modern_pdf)
 
-    _emit(progress_cb, stage="starting", percent=1, message="Starting comparison", session_id=session_id)
+    _emit(
+        progress_cb,
+        stage="starting",
+        percent=1,
+        message="Starting comparison",
+        session_id=session_id,
+    )
 
     legacy_work = session_dir / "legacy"
     modern_work = session_dir / "modern"
@@ -59,31 +74,50 @@ def compare_documents(
 
     logger.info("Saved PDF files to temp session location.")
 
-    _emit(progress_cb, stage="parsing", percent=8, message="Parsing PDF files", session_id=session_id)
+    _emit(
+        progress_cb,
+        stage="parsing",
+        percent=8,
+        message="Parsing PDF files",
+        session_id=session_id,
+    )
 
-    def docs_to_json(doc_path: str | Path, doc_type: Literal["legacy", "modern"], config: AppConfig) -> None:
+    def docs_to_json(
+        doc_path: str | Path, doc_type: Literal["legacy", "modern"], config: AppConfig
+    ) -> None:
         tree_content = build_tree(doc_path, doc_type, config)
         write_tree(tree_content, session_dir / f"{doc_type}.msgspec.json")
         return tree_content
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        thread_legacy = executor.submit(docs_to_json, legacy_work / legacy_pdf.name, "legacy", cfg)
-        thread_modern = executor.submit(docs_to_json, modern_work / modern_pdf.name, "modern", cfg)
+        thread_legacy = executor.submit(
+            docs_to_json, legacy_work / legacy_pdf.name, "legacy", cfg
+        )
+        thread_modern = executor.submit(
+            docs_to_json, modern_work / modern_pdf.name, "modern", cfg
+        )
         legacy_tree = thread_legacy.result()
         modern_tree = thread_modern.result()
 
     logger.info("Saved both Index trees in temp session location.")
 
-    _emit(progress_cb, stage="embedding", percent=25, message="Embedding leaf segments", session_id=session_id)
-
+    _emit(
+        progress_cb,
+        stage="embedding",
+        percent=25,
+        message="Embedding leaf segments",
+        session_id=session_id,
+    )
 
     legacy_texts = [normalize_text(n.text) for n in iter_leaf_nodes(legacy_tree)]
     modern_texts = [normalize_text(n.text) for n in iter_leaf_nodes(modern_tree)]
 
     logger.info("Normalized Text within the Index Trees.")
 
-    emb_backend = load_embedding_backend(cfg.embedding_model_name, cfg.fallback_embedding_model_name, cfg.hf_token)
-    
+    emb_backend = load_embedding_backend(
+        cfg.embedding_model_name, cfg.fallback_embedding_model_name, cfg.hf_token
+    )
+
     embedding_batch_size = max(int(getattr(cfg, "batch_size", 64)), 128)
 
     legacy_emb, modern_emb = embed_two_corpora(
@@ -98,11 +132,23 @@ def compare_documents(
 
     logger.info("Saved embedding in temp session path.")
 
-    _emit(progress_cb, stage="matching", percent=55, message="Running cosine + Hungarian alignment", session_id=session_id)
+    _emit(
+        progress_cb,
+        stage="matching",
+        percent=55,
+        message="Running cosine + Hungarian alignment",
+        session_id=session_id,
+    )
 
     aligned = align_trees(legacy_tree, modern_tree, legacy_emb, modern_emb, cfg)
 
-    _emit(progress_cb, stage="summarizing", percent=72, message="Building provenance-rich context packs", session_id=session_id)
+    _emit(
+        progress_cb,
+        stage="summarizing",
+        percent=72,
+        message="Building provenance-rich context packs",
+        session_id=session_id,
+    )
 
     llm_backend = load_llm_backend(cfg)
 
@@ -111,7 +157,9 @@ def compare_documents(
     for idx, match in enumerate(aligned.matches, start=1):
         if match.change_type == "unchanged":
             continue
-        ctx = build_context_pack(match, legacy_tree, modern_tree, window=cfg.neighbors_window)
+        ctx = build_context_pack(
+            match, legacy_tree, modern_tree, window=cfg.neighbors_window
+        )
         _emit(
             progress_cb,
             stage="llm",
@@ -126,10 +174,14 @@ def compare_documents(
         for chunk in stream_summary(ctx, llm_backend, cfg):
             summary = chunk
         if summary:
-            summaries.append(f"- **{match.change_type.title()}** `{match.legacy_id or match.modern_id}`: {summary}")
+            summaries.append(
+                f"- **{match.change_type.title()}** `{match.legacy_id or match.modern_id}`: {summary}"
+            )
             match.evidence_ids = ctx.get("evidence_ids", match.evidence_ids)
 
-    summary_text = "\n".join(summaries) if summaries else "No material changes detected."
+    summary_text = (
+        "\n".join(summaries) if summaries else "No material changes detected."
+    )
 
     result = ComparisonResult(
         session_id=session_id,
@@ -139,14 +191,26 @@ def compare_documents(
         summary=summary_text,
     )
 
-    _emit(progress_cb, stage="reporting", percent=95, message="Rendering report artifacts", session_id=session_id)
+    _emit(
+        progress_cb,
+        stage="reporting",
+        percent=95,
+        message="Rendering report artifacts",
+        session_id=session_id,
+    )
 
     artifact = build_report_artifact(result, session_dir / "report")
     result.report_md_path = artifact.report_md_path
     result.report_pdf_path = artifact.report_pdf_path
     result.report_json_path = artifact.report_json_path
 
-    _emit(progress_cb, stage="done", percent=100, message="Comparison complete", session_id=session_id)
+    _emit(
+        progress_cb,
+        stage="done",
+        percent=100,
+        message="Comparison complete",
+        session_id=session_id,
+    )
 
     logger.info("Document Comparison Completed!")
     return result
@@ -164,7 +228,17 @@ def compare_documents_stream(
         nonlocal latest_state
         latest_state = state
 
-    result = compare_documents(legacy_pdf, modern_pdf, output_root=output_root, cfg=cfg, progress_cb=cb)
+    result = compare_documents(
+        legacy_pdf, modern_pdf, output_root=output_root, cfg=cfg, progress_cb=cb
+    )
     if latest_state is not None:
         yield latest_state, None
-    yield ProgressState(stage="done", percent=100, message="Comparison complete", session_id=result.session_id), result
+    yield (
+        ProgressState(
+            stage="done",
+            percent=100,
+            message="Comparison complete",
+            session_id=result.session_id,
+        ),
+        result,
+    )

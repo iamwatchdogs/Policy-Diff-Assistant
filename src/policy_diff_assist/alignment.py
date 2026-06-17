@@ -8,7 +8,12 @@ from scipy.optimize import linear_sum_assignment
 
 from policy_diff_assist.config import AppConfig
 from policy_diff_assist.models import DocumentTree, MatchRecord
-from policy_diff_assist.similarity import clip01, cosine_matrix, hybrid_score, lexical_score
+from policy_diff_assist.similarity import (
+    clip01,
+    cosine_matrix,
+    hybrid_score,
+    lexical_score,
+)
 
 
 @dataclass(slots=True)
@@ -21,7 +26,8 @@ class AlignmentOutput:
 def _leaf_nodes(tree: DocumentTree) -> list:
     nodes = tree.nodes
     return [
-        nodes[nid] for nid in tree.leaf_ids
+        nodes[nid]
+        for nid in tree.leaf_ids
         if nid in nodes and nodes[nid].kind != "document"
     ]
 
@@ -49,7 +55,11 @@ def align_trees(
 
     if not legacy_nodes and not modern_nodes:
         logger.info("No Matches found between legacy and modern.")
-        return AlignmentOutput(matches=[], sim_matrix=np.zeros((0, 0), dtype=np.float32), candidate_matrix=np.zeros((0, 0), dtype=np.float32))
+        return AlignmentOutput(
+            matches=[],
+            sim_matrix=np.zeros((0, 0), dtype=np.float32),
+            candidate_matrix=np.zeros((0, 0), dtype=np.float32),
+        )
 
     sim = cosine_matrix(legacy_emb, modern_emb)
 
@@ -70,7 +80,9 @@ def align_trees(
     return AlignmentOutput(matches=matches, sim_matrix=sim, candidate_matrix=candidate)
 
 
-def _hungarian_with_unmatched(left_nodes, right_nodes, score: np.ndarray, cfg: AppConfig) -> list[MatchRecord]:
+def _hungarian_with_unmatched(
+    left_nodes, right_nodes, score: np.ndarray, cfg: AppConfig
+) -> list[MatchRecord]:
     logger.info("Processing unmatched embedding within hungarian matching.")
     n, m = score.shape
     if n == 0 and m == 0:
@@ -154,7 +166,14 @@ def _hungarian_with_unmatched(left_nodes, right_nodes, score: np.ndarray, cfg: A
         return (
             m.legacy_page if m.legacy_page is not None else 10**9,
             m.modern_page if m.modern_page is not None else 10**9,
-            {"unchanged": 0, "modified": 1, "split": 2, "merged": 3, "removed": 4, "added": 5}.get(m.change_type, 9),
+            {
+                "unchanged": 0,
+                "modified": 1,
+                "split": 2,
+                "merged": 3,
+                "removed": 4,
+                "added": 5,
+            }.get(m.change_type, 9),
             -(m.similarity or 0.0),
         )
 

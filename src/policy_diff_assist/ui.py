@@ -19,8 +19,12 @@ def create_ui(cfg: AppConfig | None = None) -> gr.Blocks:
         gr.Markdown("Upload two PDFs and get a semantic diff report with provenance.")
 
         with gr.Row():
-            legacy_file = gr.File(label="Legacy policy PDF", file_types=[".pdf"], type="filepath")
-            modern_file = gr.File(label="Modern policy PDF", file_types=[".pdf"], type="filepath")
+            legacy_file = gr.File(
+                label="Legacy policy PDF", file_types=[".pdf"], type="filepath"
+            )
+            modern_file = gr.File(
+                label="Modern policy PDF", file_types=[".pdf"], type="filepath"
+            )
 
         run_btn = gr.Button("Compare")
         status = gr.Markdown("Idle.")
@@ -50,9 +54,13 @@ def create_ui(cfg: AppConfig | None = None) -> gr.Blocks:
             status_msg = f"Done. Session `{result.session_id}`"
             yield status_msg, result.summary, result.report_pdf_path
 
-        run_btn.click(_run, inputs=[legacy_file, modern_file], outputs=[status, summary, report_file])
-    
-    log.info("UI created successfully")    
+        run_btn.click(
+            _run,
+            inputs=[legacy_file, modern_file],
+            outputs=[status, summary, report_file],
+        )
+
+    log.info("UI created successfully")
     return demo
 
 

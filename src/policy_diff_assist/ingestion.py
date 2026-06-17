@@ -134,7 +134,11 @@ def _should_merge_blocks(
     if _HEADING_RE.match(curr_text):
         return False
 
-    return same_left and close_vertically and (prev_continues or curr_looks_like_continuation)
+    return (
+        same_left
+        and close_vertically
+        and (prev_continues or curr_looks_like_continuation)
+    )
 
 
 def _merge_adjacent_blocks(
@@ -209,7 +213,9 @@ def _split_semantic_parts(text: str) -> list[str]:
     return sentence_parts if len(sentence_parts) > 1 else [text]
 
 
-def _dedupe_repeated_blocks(blocks_by_page: list[list[ExtractedBlock]]) -> list[list[ExtractedBlock]]:
+def _dedupe_repeated_blocks(
+    blocks_by_page: list[list[ExtractedBlock]],
+) -> list[list[ExtractedBlock]]:
     counts = Counter()
     for page_blocks in blocks_by_page:
         seen = set()
@@ -256,7 +262,11 @@ def _heading_path_from_text(text: str, current_path: list[str]) -> list[str]:
             levels = current_path[:]
         return levels
     # generic heading: keep current path but add slug if top-level-ish
-    return current_path[:] + [_slug_heading(stripped)] if not current_path else current_path[:]
+    return (
+        current_path[:] + [_slug_heading(stripped)]
+        if not current_path
+        else current_path[:]
+    )
 
 
 def _is_heading(block: ExtractedBlock, median_font: float) -> bool:
@@ -281,12 +291,16 @@ def _stable_hash(text: str) -> str:
     return hashlib.sha1(text.encode("utf-8")).hexdigest()[:16]
 
 
-def _node_id(doc_side: str, page: int, kind: str, path: list[str], local_index: int) -> str:
+def _node_id(
+    doc_side: str, page: int, kind: str, path: list[str], local_index: int
+) -> str:
     path_part = ".".join(path) if path else "root"
     return f"{doc_side}:p{page:02d}:{path_part}:{kind}{local_index}"
 
 
-def build_tree(pdf_path: str | Path, doc_side: str, cfg: AppConfig | None = None) -> DocumentTree:
+def build_tree(
+    pdf_path: str | Path, doc_side: str, cfg: AppConfig | None = None
+) -> DocumentTree:
     log.info("Started Built tree for {}", pdf_path)
 
     cfg = cfg or AppConfig.load()
@@ -294,10 +308,12 @@ def build_tree(pdf_path: str | Path, doc_side: str, cfg: AppConfig | None = None
     doc = fitz.open(pdf_path)
 
     log.info("Read the document {}", pdf_path)
-    
+
     blocks_by_page = [_page_blocks(page) for page in doc]
     blocks_by_page = _dedupe_repeated_blocks(blocks_by_page)
-    blocks_by_page = [_merge_adjacent_blocks(page_blocks) for page_blocks in blocks_by_page]
+    blocks_by_page = [
+        _merge_adjacent_blocks(page_blocks) for page_blocks in blocks_by_page
+    ]
 
     page_count = len(blocks_by_page)
     node_map: dict[str, SourceNode] = {}
@@ -322,7 +338,12 @@ def build_tree(pdf_path: str | Path, doc_side: str, cfg: AppConfig | None = None
     paragraph_counter_by_page: dict[int, int] = defaultdict(int)
 
     median_font = 0.0
-    all_sizes = [blk.font_size for page_blocks in blocks_by_page for blk in page_blocks if blk.font_size > 0]
+    all_sizes = [
+        blk.font_size
+        for page_blocks in blocks_by_page
+        for blk in page_blocks
+        if blk.font_size > 0
+    ]
     if all_sizes:
         all_sizes_sorted = sorted(all_sizes)
         median_font = all_sizes_sorted[len(all_sizes_sorted) // 2]
@@ -348,7 +369,13 @@ def build_tree(pdf_path: str | Path, doc_side: str, cfg: AppConfig | None = None
             if _is_heading(blk, median_font):
                 current_path = _heading_path_from_text(text, current_path)
                 section_counter_by_page[page_index] += 1
-                sec_id = _node_id(doc_side, page_index, "section", current_path, section_counter_by_page[page_index])
+                sec_id = _node_id(
+                    doc_side,
+                    page_index,
+                    "section",
+                    current_path,
+                    section_counter_by_page[page_index],
+                )
                 current_section_id = sec_id
                 node_map[sec_id] = SourceNode(
                     node_id=sec_id,
@@ -374,7 +401,13 @@ def build_tree(pdf_path: str | Path, doc_side: str, cfg: AppConfig | None = None
 
             for part in parts:
                 paragraph_counter_by_page[page_index] += 1
-                para_id = _node_id(doc_side, page_index, "para", current_path, paragraph_counter_by_page[page_index])
+                para_id = _node_id(
+                    doc_side,
+                    page_index,
+                    "para",
+                    current_path,
+                    paragraph_counter_by_page[page_index],
+                )
 
                 kind = "bullet" if _BULLET_RE.match(part) else "paragraph"
                 node_map[para_id] = SourceNode(

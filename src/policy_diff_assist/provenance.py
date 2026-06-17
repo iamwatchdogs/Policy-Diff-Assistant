@@ -31,7 +31,9 @@ def trace_node(tree: DocumentTree, node_id: str) -> dict[str, Any] | None:
     return {
         "node": _node_to_dict(node),
         "parents": parents,
-        "children": [_node_to_dict(tree.nodes[c]) for c in node.children if c in tree.nodes],
+        "children": [
+            _node_to_dict(tree.nodes[c]) for c in node.children if c in tree.nodes
+        ],
     }
 
 
@@ -76,8 +78,24 @@ def build_context_pack(
     legacy_node = legacy_tree.nodes.get(match.legacy_id) if match.legacy_id else None
     modern_node = modern_tree.nodes.get(match.modern_id) if match.modern_id else None
 
-    legacy_neighbors = [_node_to_dict(legacy_tree.nodes[nid]) for nid in _neighbor_ids(legacy_tree, match.legacy_id or "", window) if nid in legacy_tree.nodes] if match.legacy_id else []
-    modern_neighbors = [_node_to_dict(modern_tree.nodes[nid]) for nid in _neighbor_ids(modern_tree, match.modern_id or "", window) if nid in modern_tree.nodes] if match.modern_id else []
+    legacy_neighbors = (
+        [
+            _node_to_dict(legacy_tree.nodes[nid])
+            for nid in _neighbor_ids(legacy_tree, match.legacy_id or "", window)
+            if nid in legacy_tree.nodes
+        ]
+        if match.legacy_id
+        else []
+    )
+    modern_neighbors = (
+        [
+            _node_to_dict(modern_tree.nodes[nid])
+            for nid in _neighbor_ids(modern_tree, match.modern_id or "", window)
+            if nid in modern_tree.nodes
+        ]
+        if match.modern_id
+        else []
+    )
 
     logger.info("Built trace back context for LLM processing.")
 
@@ -98,7 +116,9 @@ def build_context_pack(
     }
 
 
-def expand_context_for_section(tree: DocumentTree, node_id: str, window: int = 2) -> list[dict[str, Any]]:
+def expand_context_for_section(
+    tree: DocumentTree, node_id: str, window: int = 2
+) -> list[dict[str, Any]]:
     if node_id not in tree.nodes:
         return []
     idx = tree.leaf_positions.get(node_id)
