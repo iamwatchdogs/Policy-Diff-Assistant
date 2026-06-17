@@ -19,6 +19,16 @@ dependencies = [
     "numpy>=1.24",
     "scipy>=1.11",
     "gradio>=4.0",
+    "accelerate>=1.14.0",
+    "safetensors>=0.8.0",
+    "huggingface-hub>=1.19.0",
+    "scikit-learn>=1.7.2",
+    "rapidfuzz>=3.14.5",
+    "jinja2>=3.1.6",
+    "markdown>=3.10.2",
+    "python-dotenv>=1.2.2",
+    "loguru>=0.7.3",
+    "rich>=15.0.0",
 ]
 
 [project.optional-dependencies]
@@ -31,6 +41,9 @@ dev = [
 ]
 gpu = [
     "bitsandbytes>=0.41",  # Quantization for GPU inference
+]
+inference = [
+    "vllm"
 ]
 
 [project.scripts]
