@@ -16,6 +16,11 @@ from policy_diff_assist.similarity import (
     lexical_score,
 )
 
+try:
+    from policy_diff_assist.similarity import build_hybrid_score_matrix  # type: ignore
+except Exception:  # pragma: no cover
+    build_hybrid_score_matrix = None  # type: ignore
+
 
 @dataclass(slots=True)
 class AlignmentOutput:
@@ -93,13 +98,94 @@ def _candidate_mask(a, b) -> bool:
     return False
 
 
+def _cosine_matrix_compat(
+    left_emb: np.ndarray,
+    right_emb: np.ndarray,
+    cfg: AppConfig,
+) -> np.ndarray:
+    """
+    Keeps compatibility with the current similarity.py signature while also
+    supporting the optimized signature when present.
+    """
+    use_gpu = getattr(cfg, "similarity_use_gpu", True)
+    gpu_mode = getattr(cfg, "similarity_gpu_mode", "auto")
+
+    if use_gpu:
+        try:
+            return cosine_matrix(left_emb, right_emb, use_gpu=gpu_mode)  # type: ignore[arg-type]
+        except TypeError:
+            pass
+        except Exception as exc:  # pragma: no cover
+            logger.warning("GPU cosine path failed, falling back to CPU: {}", exc)
+
+    return cosine_matrix(left_emb, right_emb)
+
+
+def _build_fast_candidate_matrix(
+    left_nodes: list,
+    right_nodes: list,
+    left_emb: np.ndarray,
+    right_emb: np.ndarray,
+    cfg: AppConfig,
+) -> np.ndarray | None:
+    """
+    Optional fast path. Returns None if the optimized helper is unavailable
+    or fails for any reason.
+    """
+    if build_hybrid_score_matrix is None:
+        return None
+
+    try:
+        return build_hybrid_score_matrix(
+            left_texts=[n.text for n in left_nodes],
+            right_texts=[n.text for n in right_nodes],
+            left_embeddings=left_emb,
+            right_embeddings=right_emb,
+            left_paths=[n.path for n in left_nodes],
+            right_paths=[n.path for n in right_nodes],
+            left_pages=[n.page for n in left_nodes],
+            right_pages=[n.page for n in right_nodes],
+            left_kinds=[n.kind for n in left_nodes],
+            right_kinds=[n.kind for n in right_nodes],
+            left_token_counts=[n.token_count for n in left_nodes],
+            right_token_counts=[n.token_count for n in right_nodes],
+            use_gpu=getattr(cfg, "similarity_use_gpu", True),
+            max_workers=(getattr(cfg, "similarity_max_workers", 0) or None),
+        )
+    except TypeError:
+        return None
+    except Exception as exc:  # pragma: no cover
+        logger.warning(
+            "Fast similarity path failed, falling back to serial path: {}", exc
+        )
+        return None
+
+
 def _score_matrix(
     left_nodes: list,
     right_nodes: list,
     left_emb: np.ndarray,
     right_emb: np.ndarray,
+    cfg: AppConfig,
 ) -> tuple[np.ndarray, np.ndarray]:
-    sim = cosine_matrix(left_emb, right_emb)
+    sim = _cosine_matrix_compat(left_emb, right_emb, cfg)
+
+    fast_candidate = _build_fast_candidate_matrix(
+        left_nodes, right_nodes, left_emb, right_emb, cfg
+    )
+    if fast_candidate is not None:
+        candidate = np.asarray(fast_candidate, dtype=np.float32, order="C")
+        invalid = np.zeros_like(candidate, dtype=bool)
+
+        for i, ln in enumerate(left_nodes):
+            for j, rn in enumerate(right_nodes):
+                if not _candidate_mask(ln, rn):
+                    invalid[i, j] = True
+
+        candidate[invalid] = 0.0
+        np.clip(candidate, 0.0, 1.0, out=candidate)
+        return sim, candidate
+
     candidate = np.zeros_like(sim, dtype=np.float32)
 
     for i, ln in enumerate(left_nodes):
@@ -283,16 +369,27 @@ def align_trees(
     legacy_index = _node_index_map(legacy_tree)
     modern_index = _node_index_map(modern_tree)
 
+    legacy_rows = [legacy_index[n.node_id] for n in legacy_nodes]
+    modern_rows = [modern_index[n.node_id] for n in modern_nodes]
+
+    legacy_input = (
+        legacy_emb[legacy_rows]
+        if legacy_rows
+        else np.zeros((0, legacy_emb.shape[1]), dtype=np.float32)
+    )
+    modern_input = (
+        modern_emb[modern_rows]
+        if modern_rows
+        else np.zeros((0, modern_emb.shape[1]), dtype=np.float32)
+    )
+
     # Full matrices preserve a complete diagnostic view for downstream consumers.
     full_sim, full_candidate = _score_matrix(
         legacy_nodes,
         modern_nodes,
-        legacy_emb[[legacy_index[n.node_id] for n in legacy_nodes]]
-        if legacy_nodes
-        else np.zeros((0, legacy_emb.shape[1]), dtype=np.float32),
-        modern_emb[[modern_index[n.node_id] for n in modern_nodes]]
-        if modern_nodes
-        else np.zeros((0, modern_emb.shape[1]), dtype=np.float32),
+        legacy_input,
+        modern_input,
+        cfg,
     )
 
     legacy_sections = _section_nodes(legacy_tree)

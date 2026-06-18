@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import MISSING, dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +24,16 @@ def _read_toml(path: Path) -> dict[str, Any]:
         return {}
     with path.open("rb") as f:
         return _toml.load(f)
+
+
+def _as_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    return str(value).strip().lower() in {"1", "true", "yes", "on", "y"}
 
 
 @dataclass(slots=True)
@@ -51,6 +61,18 @@ class AppConfig:
     keep_intermediate_json: bool = True
     hf_token: str | None = None
 
+    similarity_use_gpu: bool = True
+    similarity_gpu_mode: str = "auto"
+    similarity_max_workers: int = 0
+    similarity_parallel_lexical: bool = True
+    similarity_parallel_heading: bool = True
+    similarity_gpu_cosine: bool = True
+
+    omp_num_threads: int = 0
+    mkl_num_threads: int = 0
+    openblas_num_threads: int = 0
+    numexpr_max_threads: int = 0
+
     @classmethod
     def load(cls, base_dir: str | os.PathLike[str] | None = None) -> "AppConfig":
         project_root = Path(base_dir or Path.cwd()).resolve()
@@ -59,6 +81,22 @@ class AppConfig:
         app_toml = _read_toml(config_dir / "app.toml")
         env = os.environ
 
+        def _default(name: str) -> Any:
+            field_def = cls.__dataclass_fields__[name]
+            if field_def.default is not MISSING:
+                return field_def.default
+            if field_def.default_factory is not MISSING:  # type: ignore[truthy-function]
+                return field_def.default_factory()  # type: ignore[misc]
+            return None
+
+        def _env_or_toml(env_key: str, toml_key: str, field_name: str) -> Any:
+            value = env.get(env_key)
+            if value is not None:
+                return value
+            if toml_key in app_toml:
+                return app_toml[toml_key]
+            return _default(field_name)
+
         cfg = cls(
             project_root=project_root,
             data_dir=project_root / "data",
@@ -66,74 +104,115 @@ class AppConfig:
             reports_dir=project_root / "data" / "reports",
             logs_dir=project_root / "logs",
             config_dir=config_dir,
-            embedding_model_name=env.get(
-                "EMBEDDING_MODEL",
-                app_toml.get("embedding_model_name", cls.embedding_model_name),
+            embedding_model_name=_env_or_toml(
+                "EMBEDDING_MODEL", "embedding_model_name", "embedding_model_name"
             ),
-            fallback_embedding_model_name=env.get(
+            fallback_embedding_model_name=_env_or_toml(
                 "FALLBACK_EMBEDDING_MODEL",
-                app_toml.get(
-                    "fallback_embedding_model_name", cls.fallback_embedding_model_name
-                ),
+                "fallback_embedding_model_name",
+                "fallback_embedding_model_name",
             ),
-            llm_model_name=env.get(
-                "LLM_MODEL", app_toml.get("llm_model_name", cls.llm_model_name)
+            llm_model_name=_env_or_toml(
+                "LLM_MODEL", "llm_model_name", "llm_model_name"
             ),
-            use_vllm=_as_bool(
-                env.get("USE_VLLM", app_toml.get("use_vllm", cls.use_vllm))
-            ),
+            use_vllm=_as_bool(_env_or_toml("USE_VLLM", "use_vllm", "use_vllm")),
             temperature=float(
-                env.get("TEMPERATURE", app_toml.get("temperature", cls.temperature))
+                _env_or_toml("TEMPERATURE", "temperature", "temperature")
             ),
             max_new_tokens=int(
-                env.get(
-                    "MAX_NEW_TOKENS", app_toml.get("max_new_tokens", cls.max_new_tokens)
-                )
+                _env_or_toml("MAX_NEW_TOKENS", "max_new_tokens", "max_new_tokens")
             ),
             top_k_candidates=int(
-                env.get(
-                    "TOP_K_CANDIDATES",
-                    app_toml.get("top_k_candidates", cls.top_k_candidates),
-                )
+                _env_or_toml("TOP_K_CANDIDATES", "top_k_candidates", "top_k_candidates")
             ),
             min_similarity=float(
-                env.get(
-                    "MIN_SIMILARITY", app_toml.get("min_similarity", cls.min_similarity)
-                )
+                _env_or_toml("MIN_SIMILARITY", "min_similarity", "min_similarity")
             ),
             unchanged_threshold=float(
-                env.get(
-                    "UNCHANGED_THRESHOLD",
-                    app_toml.get("unchanged_threshold", cls.unchanged_threshold),
+                _env_or_toml(
+                    "UNCHANGED_THRESHOLD", "unchanged_threshold", "unchanged_threshold"
                 )
             ),
             modified_threshold=float(
-                env.get(
-                    "MODIFIED_THRESHOLD",
-                    app_toml.get("modified_threshold", cls.modified_threshold),
+                _env_or_toml(
+                    "MODIFIED_THRESHOLD", "modified_threshold", "modified_threshold"
                 )
             ),
-            batch_size=int(
-                env.get("BATCH_SIZE", app_toml.get("batch_size", cls.batch_size))
-            ),
-            chunk_chars=int(
-                env.get("CHUNK_CHARS", app_toml.get("chunk_chars", cls.chunk_chars))
-            ),
+            batch_size=int(_env_or_toml("BATCH_SIZE", "batch_size", "batch_size")),
+            chunk_chars=int(_env_or_toml("CHUNK_CHARS", "chunk_chars", "chunk_chars")),
             neighbors_window=int(
-                env.get(
-                    "NEIGHBORS_WINDOW",
-                    app_toml.get("neighbors_window", cls.neighbors_window),
-                )
+                _env_or_toml("NEIGHBORS_WINDOW", "neighbors_window", "neighbors_window")
             ),
             keep_intermediate_json=_as_bool(
-                env.get(
+                _env_or_toml(
                     "KEEP_INTERMEDIATE_JSON",
-                    app_toml.get("keep_intermediate_json", cls.keep_intermediate_json),
+                    "keep_intermediate_json",
+                    "keep_intermediate_json",
                 )
             ),
             hf_token=env.get("HF_TOKEN") or app_toml.get("hf_token"),
+            similarity_use_gpu=_as_bool(
+                _env_or_toml(
+                    "SIMILARITY_USE_GPU",
+                    "similarity_use_gpu",
+                    "similarity_use_gpu",
+                )
+            ),
+            similarity_gpu_mode=str(
+                _env_or_toml(
+                    "SIMILARITY_GPU_MODE", "similarity_gpu_mode", "similarity_gpu_mode"
+                )
+            ),
+            similarity_max_workers=int(
+                _env_or_toml(
+                    "SIMILARITY_MAX_WORKERS",
+                    "similarity_max_workers",
+                    "similarity_max_workers",
+                )
+            ),
+            similarity_parallel_lexical=_as_bool(
+                _env_or_toml(
+                    "SIMILARITY_PARALLEL_LEXICAL",
+                    "similarity_parallel_lexical",
+                    "similarity_parallel_lexical",
+                )
+            ),
+            similarity_parallel_heading=_as_bool(
+                _env_or_toml(
+                    "SIMILARITY_PARALLEL_HEADING",
+                    "similarity_parallel_heading",
+                    "similarity_parallel_heading",
+                )
+            ),
+            similarity_gpu_cosine=_as_bool(
+                _env_or_toml(
+                    "SIMILARITY_GPU_COSINE",
+                    "similarity_gpu_cosine",
+                    "similarity_gpu_cosine",
+                )
+            ),
+            omp_num_threads=int(
+                _env_or_toml("OMP_NUM_THREADS", "omp_num_threads", "omp_num_threads")
+            ),
+            mkl_num_threads=int(
+                _env_or_toml("MKL_NUM_THREADS", "mkl_num_threads", "mkl_num_threads")
+            ),
+            openblas_num_threads=int(
+                _env_or_toml(
+                    "OPENBLAS_NUM_THREADS",
+                    "openblas_num_threads",
+                    "openblas_num_threads",
+                )
+            ),
+            numexpr_max_threads=int(
+                _env_or_toml(
+                    "NUMEXPR_MAX_THREADS", "numexpr_max_threads", "numexpr_max_threads"
+                )
+            ),
         )
+
         cfg.ensure_dirs()
+        cfg.configure_similarity_runtime()
         return cfg
 
     def ensure_dirs(self) -> None:
@@ -146,15 +225,34 @@ class AppConfig:
         ]:
             path.mkdir(parents=True, exist_ok=True)
 
+    def configure_similarity_runtime(self) -> None:
+        if self.omp_num_threads > 0:
+            os.environ.setdefault("OMP_NUM_THREADS", str(self.omp_num_threads))
+        elif "OMP_NUM_THREADS" not in os.environ and self.similarity_max_workers > 0:
+            os.environ["OMP_NUM_THREADS"] = str(self.similarity_max_workers)
 
-def _as_bool(value: Any) -> bool:
-    if isinstance(value, bool):
-        return value
-    if value is None:
-        return False
-    if isinstance(value, (int, float)):
-        return bool(value)
-    return str(value).strip().lower() in {"1", "true", "yes", "on", "y"}
+        if self.mkl_num_threads > 0:
+            os.environ.setdefault("MKL_NUM_THREADS", str(self.mkl_num_threads))
+        elif "MKL_NUM_THREADS" not in os.environ and self.similarity_max_workers > 0:
+            os.environ["MKL_NUM_THREADS"] = str(self.similarity_max_workers)
+
+        if self.openblas_num_threads > 0:
+            os.environ.setdefault(
+                "OPENBLAS_NUM_THREADS", str(self.openblas_num_threads)
+            )
+        elif (
+            "OPENBLAS_NUM_THREADS" not in os.environ and self.similarity_max_workers > 0
+        ):
+            os.environ["OPENBLAS_NUM_THREADS"] = str(self.similarity_max_workers)
+
+        if self.numexpr_max_threads > 0:
+            os.environ.setdefault("NUMEXPR_MAX_THREADS", str(self.numexpr_max_threads))
+        elif (
+            "NUMEXPR_MAX_THREADS" not in os.environ and self.similarity_max_workers > 0
+        ):
+            os.environ["NUMEXPR_MAX_THREADS"] = str(self.similarity_max_workers)
+
+        os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
 
 def build_default_session_dir(cfg: AppConfig, session_id: str) -> Path:
