@@ -4,8 +4,7 @@ import gradio as gr
 
 from policy_diff_assist.config import AppConfig
 from policy_diff_assist.logging import setup_logging, get_logger
-from policy_diff_assist.pipeline import compare_documents
-from policy_diff_assist.models import ProgressState
+from policy_diff_assist.pipeline import compare_documents_stream
 
 log = get_logger(__name__)
 
@@ -31,28 +30,20 @@ def create_ui(cfg: AppConfig | None = None) -> gr.Blocks:
         summary = gr.Markdown("")
         report_file = gr.File(label="Download report", interactive=False)
 
-        def _run(legacy_fp, modern_fp, progress=gr.Progress(track_tqdm=False)):
+        def _run(legacy_fp, modern_fp):
             if legacy_fp is None or modern_fp is None:
                 yield "Please upload both PDFs.", "", None
                 return
 
             log.info("User submitted PDFs")
 
-            def progress_cb(state: ProgressState):
-                progress(
-                    min(max(state.percent / 100.0, 0.0), 1.0),
-                    desc=f"{state.stage}: {state.message}",
-                )
-
-            result = compare_documents(
+            for event in compare_documents_stream(
                 legacy_fp,
                 modern_fp,
                 output_root=cfg.sessions_dir,
                 cfg=cfg,
-                progress_cb=progress_cb,
-            )
-            status_msg = f"Done. Session `{result.session_id}`"
-            yield status_msg, result.summary, result.report_pdf_path
+            ):
+                yield event.status, event.summary, event.report_path
 
         run_btn.click(
             _run,
@@ -65,8 +56,7 @@ def create_ui(cfg: AppConfig | None = None) -> gr.Blocks:
 
 
 def launch() -> None:
-    log.info("Application Initiated")
-
+    log.info("Application initiated")
     cfg = AppConfig.load()
     demo = create_ui(cfg)
     demo.queue(default_concurrency_limit=1).launch(share=True)
