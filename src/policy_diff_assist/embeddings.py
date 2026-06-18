@@ -21,7 +21,6 @@ except Exception:  # pragma: no cover
 from transformers import AutoModel, AutoTokenizer
 
 
-
 @dataclass(slots=True)
 class EmbeddingBackend:
     name: str
@@ -32,7 +31,9 @@ class EmbeddingBackend:
     dtype: torch.dtype | None = None
     max_length: int = 512
     fallback: bool = False
-    backend_type: Literal["transformers", "sentence_transformers", "hash"] = "transformers"  
+    backend_type: Literal["transformers", "sentence_transformers", "hash"] = (
+        "transformers"
+    )
 
 
 def _configure_runtime() -> None:
@@ -61,8 +62,16 @@ def _safe_max_length(tokenizer: object, default: int = 512) -> int:
     return min(raw_int, default)
 
 
-def _infer_dim(model: object, tokenizer: object | None = None, device: str = "cpu") -> int:
-    for attr in ("sentence_embedding_dimension", "hidden_size", "dim", "embedding_size", "word_embed_proj_dim"):
+def _infer_dim(
+    model: object, tokenizer: object | None = None, device: str = "cpu"
+) -> int:
+    for attr in (
+        "sentence_embedding_dimension",
+        "hidden_size",
+        "dim",
+        "embedding_size",
+        "word_embed_proj_dim",
+    ):
         try:
             value = getattr(getattr(model, "config", None), attr, None)
             if value is not None:
@@ -72,7 +81,9 @@ def _infer_dim(model: object, tokenizer: object | None = None, device: str = "cp
 
     if tokenizer is not None and hasattr(model, "__call__"):
         try:
-            sample = tokenizer("dimension probe", return_tensors="pt", padding=True, truncation=True)
+            sample = tokenizer(
+                "dimension probe", return_tensors="pt", padding=True, truncation=True
+            )
             sample = {k: v.to(device) for k, v in sample.items()}
             with torch.inference_mode():
                 outputs = model(**sample)  # type: ignore[misc]
@@ -87,7 +98,9 @@ def _infer_dim(model: object, tokenizer: object | None = None, device: str = "cp
 
 
 @lru_cache(maxsize=4)
-def load_embedding_backend(model_name: str, fallback_name: str, hf_token: str | None = None) -> EmbeddingBackend:
+def load_embedding_backend(
+    model_name: str, fallback_name: str, hf_token: str | None = None
+) -> EmbeddingBackend:
     _configure_runtime()
 
     device = "cuda" if torch.cuda.is_available() else "cpu"
@@ -115,7 +128,13 @@ def load_embedding_backend(model_name: str, fallback_name: str, hf_token: str | 
         dim = _infer_dim(model, tokenizer, device=device)
         max_length = _safe_max_length(tokenizer, default=512)
 
-        logger.info("Loaded embedding model {} on {} (dim={}, max_length={})", model_name, device, dim, max_length)
+        logger.info(
+            "Loaded embedding model {} on {} (dim={}, max_length={})",
+            model_name,
+            device,
+            dim,
+            max_length,
+        )
         return EmbeddingBackend(
             name=model_name,
             dim=dim,
@@ -128,7 +147,9 @@ def load_embedding_backend(model_name: str, fallback_name: str, hf_token: str | 
             backend_type="transformers",
         )
     except Exception as exc:
-        logger.warning("Could not load transformers embedding model {}: {}", model_name, exc)
+        logger.warning(
+            "Could not load transformers embedding model {}: {}", model_name, exc
+        )
 
     # Secondary fallback: SentenceTransformer
     if SentenceTransformer is not None:
@@ -150,7 +171,9 @@ def load_embedding_backend(model_name: str, fallback_name: str, hf_token: str | 
                 backend_type="sentence_transformers",
             )
         except Exception as exc:
-            logger.warning("Could not load SentenceTransformer model {}: {}", model_name, exc)
+            logger.warning(
+                "Could not load SentenceTransformer model {}: {}", model_name, exc
+            )
 
         try:
             kwargs = {}
@@ -170,7 +193,11 @@ def load_embedding_backend(model_name: str, fallback_name: str, hf_token: str | 
                 backend_type="sentence_transformers",
             )
         except Exception as exc:
-            logger.warning("Could not load fallback SentenceTransformer model {}: {}", fallback_name, exc)
+            logger.warning(
+                "Could not load fallback SentenceTransformer model {}: {}",
+                fallback_name,
+                exc,
+            )
 
     logger.warning("Using hash-based embeddings fallback")
     return EmbeddingBackend(
@@ -186,7 +213,9 @@ def load_embedding_backend(model_name: str, fallback_name: str, hf_token: str | 
 
 
 def _hash_embeddings(texts: list[str], dim: int = 768) -> np.ndarray:
-    vectorizer = HashingVectorizer(n_features=dim, alternate_sign=False, norm=None, analyzer="word")
+    vectorizer = HashingVectorizer(
+        n_features=dim, alternate_sign=False, norm=None, analyzer="word"
+    )
     mat = vectorizer.transform(texts)
     arr = mat.toarray().astype(np.float32, copy=False)
     arr = sk_normalize(arr, norm="l2", axis=1, copy=False)
@@ -198,7 +227,9 @@ def _batched(items: list[str], batch_size: int) -> Iterable[list[str]]:
         yield items[i : i + batch_size]
 
 
-def _mean_pool(last_hidden_state: torch.Tensor, attention_mask: torch.Tensor) -> torch.Tensor:
+def _mean_pool(
+    last_hidden_state: torch.Tensor, attention_mask: torch.Tensor
+) -> torch.Tensor:
     mask = attention_mask.unsqueeze(-1).to(dtype=last_hidden_state.dtype)
     summed = (last_hidden_state * mask).sum(dim=1)
     denom = mask.sum(dim=1).clamp_min(1e-9)
@@ -229,7 +260,10 @@ def embed_texts(
             )
             return np.asarray(emb, dtype=np.float32)
         except Exception as exc:
-            logger.warning("SentenceTransformer encode failed ({}); falling back to hash vectors", exc)
+            logger.warning(
+                "SentenceTransformer encode failed ({}); falling back to hash vectors",
+                exc,
+            )
             return _hash_embeddings(texts, dim=backend.dim)
 
     tokenizer = backend.tokenizer
@@ -241,7 +275,11 @@ def embed_texts(
     write_pos = 0
 
     amp_enabled = device == "cuda" and backend.dtype is not None
-    amp_ctx = torch.autocast(device_type="cuda", dtype=backend.dtype) if amp_enabled else nullcontext()
+    amp_ctx = (
+        torch.autocast(device_type="cuda", dtype=backend.dtype)
+        if amp_enabled
+        else nullcontext()
+    )
 
     try:
         with torch.inference_mode():
@@ -258,7 +296,10 @@ def embed_texts(
                 with amp_ctx:
                     outputs = model(**enc)  # type: ignore[misc]
 
-                if hasattr(outputs, "pooler_output") and outputs.pooler_output is not None:
+                if (
+                    hasattr(outputs, "pooler_output")
+                    and outputs.pooler_output is not None
+                ):
                     emb = outputs.pooler_output
                 else:
                     emb = _mean_pool(outputs.last_hidden_state, enc["attention_mask"])  # type: ignore[attr-defined]
@@ -272,7 +313,9 @@ def embed_texts(
 
         return result
     except Exception as exc:
-        logger.warning("Transformers embedding failed ({}); falling back to hash vectors", exc)
+        logger.warning(
+            "Transformers embedding failed ({}); falling back to hash vectors", exc
+        )
         return _hash_embeddings(texts, dim=backend.dim)
 
 
@@ -288,10 +331,14 @@ def embed_two_corpora(
         empty = np.zeros((0, backend.dim), dtype=np.float32)
         return empty, empty
 
-    all_emb = embed_texts(backend, all_texts, batch_size=batch_size, max_length=max_length)
+    all_emb = embed_texts(
+        backend, all_texts, batch_size=batch_size, max_length=max_length
+    )
     split_at = len(legacy_texts)
     return all_emb[:split_at], all_emb[split_at:]
 
 
-def embed_iterable(backend: EmbeddingBackend, texts: Iterable[str], batch_size: int = 1024) -> np.ndarray:
+def embed_iterable(
+    backend: EmbeddingBackend, texts: Iterable[str], batch_size: int = 1024
+) -> np.ndarray:
     return embed_texts(backend, list(texts), batch_size=batch_size)

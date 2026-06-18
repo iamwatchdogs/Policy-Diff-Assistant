@@ -119,7 +119,7 @@ def compare_documents(
     )
 
     embedding_batch_size = max(int(getattr(cfg, "batch_size", 64)), 1024)
-    
+
     legacy_emb, modern_emb = embed_two_corpora(
         emb_backend,
         legacy_texts,
