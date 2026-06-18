@@ -7,7 +7,7 @@ from loguru import logger
 
 
 def cosine_matrix(left: np.ndarray, right: np.ndarray) -> np.ndarray:
-    logger.info("Computing cosine simiarities")
+    logger.info("Computing cosine similarities")
     if left.size == 0 or right.size == 0:
         return np.zeros((left.shape[0], right.shape[0]), dtype=np.float32)
     left = np.asarray(left, dtype=np.float32)
@@ -35,8 +35,33 @@ def heading_similarity(path_a: list[str] | None, path_b: list[str] | None) -> fl
     return common / max(len(path_a), len(path_b), 1)
 
 
+def kind_compatibility(kind_a: str | None, kind_b: str | None) -> float:
+    """
+    Encourage section-section matches first, then paragraph/bullet matches.
+    """
+    if kind_a is None or kind_b is None:
+        return 0.0
+    if kind_a == kind_b:
+        if kind_a == "section":
+            return 1.0
+        return 0.6
+    pair = {kind_a, kind_b}
+    if pair <= {"paragraph", "bullet"}:
+        return 0.35
+    return -0.5
+
+
+def token_balance_bonus(token_count_a: int | None, token_count_b: int | None) -> float:
+    if token_count_a is None or token_count_b is None:
+        return 0.0
+    a = max(int(token_count_a), 1)
+    b = max(int(token_count_b), 1)
+    ratio = min(a, b) / max(a, b)
+    return 0.05 * ratio
+
+
 def page_proximity_bonus(page_a: int | None, page_b: int | None) -> float:
-    logger.info("Computing page proximit bonus.")
+    logger.info("Computing page proximity bonus")
     if page_a is None or page_b is None:
         return 0.0
     dist = abs(page_a - page_b)
@@ -56,12 +81,59 @@ def hybrid_score(
     path_b: list[str] | None,
     page_a: int | None,
     page_b: int | None,
+    *,
+    kind_a: str | None = None,
+    kind_b: str | None = None,
+    token_count_a: int | None = None,
+    token_count_b: int | None = None,
 ) -> tuple[float, float, float]:
+    """
+    Tree-aware hybrid score.
+
+    The section-first tree should rely on:
+    - embedding similarity
+    - heading/path agreement
+    - node kind agreement
+    - rough size balance
+    - page proximity
+    """
     same_heading = heading_similarity(path_a, path_b)
-    heading_bonus = 0.06 * same_heading
+    heading_bonus = 0.08 * same_heading
+
+    kind_bonus = kind_compatibility(kind_a, kind_b)
+    size_bonus = token_balance_bonus(token_count_a, token_count_b)
     page_bonus = page_proximity_bonus(page_a, page_b)
-    score = 0.84 * cosine + 0.10 * lexical + heading_bonus + page_bonus
-    logger.info("Compuated score: {}", score)
+
+    # Stronger structural prior for section matches, lighter for body nodes.
+    if kind_a == kind_b == "section":
+        score = (
+            0.74 * cosine
+            + 0.10 * lexical
+            + heading_bonus
+            + page_bonus
+            + 0.05
+            + size_bonus
+        )
+    elif {kind_a, kind_b} <= {"paragraph", "bullet"}:
+        score = (
+            0.82 * cosine
+            + 0.10 * lexical
+            + 0.5 * heading_bonus
+            + page_bonus
+            + kind_bonus
+            + size_bonus
+        )
+    else:
+        score = (
+            0.80 * cosine
+            + 0.10 * lexical
+            + heading_bonus
+            + page_bonus
+            + kind_bonus
+            + size_bonus
+        )
+
+    logger.info("Computed hybrid score: {}", score)
     return float(score), float(heading_bonus), float(page_bonus)
 
 
